@@ -1,7 +1,7 @@
 # Recording Indicator For OBS Studio
 > **Recording Indicator For Your OBS Studio**
 
-![alt text](./assets/preview.png)
+<img src="./assets/summary_preview.png" alt="preview image" width="200"/>
 
 --- 
 
