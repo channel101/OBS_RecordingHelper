@@ -1,6 +1,7 @@
+import ctypes  
 import tkinter as tk
-from tkinter import *
-import threading
+from tkinter import BOTH, Canvas, Frame, Label, Menu, threading
+import sys 
 import obspython as obs
 
 # --------------------------------------------------
@@ -54,7 +55,17 @@ class Application(tk.Frame):
         self.master.attributes("-transparentcolor", "#0f0f0f")
         self.config(bg="#0f0f0f")
 
-        # Modern container frame with subtle border
+        if sys.platform == "win32":
+            try:
+                self.master.update()
+                WDA_EXCLUDEFROMCAPTURE = 0x00000011
+                user32 = ctypes.windll.user32
+                hwnd = user32.GetParent(self.master.winfo_id())
+                user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
+            except Exception:
+                pass
+
+        self.master.attributes("-alpha", win_opacity) 
         container = Frame(
             self,
             bg="#252525",
@@ -291,10 +302,6 @@ def frontend_event_handler(data):
     global window_start
     global loop_destroy
 
-    if data == obs.OBS_FRONTEND_EVENT_FINISHED_LOADING:
-        if not thd.is_alive():
-            thd.start()
-
     if data == obs.OBS_FRONTEND_EVENT_RECORDING_STARTING:
         window_start = True
         is_paused = False
@@ -311,6 +318,14 @@ def frontend_event_handler(data):
     if data == obs.OBS_FRONTEND_EVENT_RECORDING_UNPAUSED:
         is_paused = False
 
+def script_load(settings):
+    global thd
+    if not thd.is_alive():
+        thd.start()
+
+def script_unload():
+    global loop_destroy
+    loop_destroy = True     
 
 def script_update(settings):
     obs.obs_data_set_default_bool(settings, "timer_bool", True)
@@ -337,16 +352,13 @@ def script_description():
     <h2><font color="white">Recording Indicator</font></h2>
     <p>Recording Indicator For Your OBS Studio</p>
     <hr>
-    <p><img src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTYgMTYiIHZlcnNpb249IjEuMSIgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjODI1MGRmIj4KICA8cGF0aCBkPSJNMS43NSAwaDEyLjVDMTUuMjE2IDAgMTYgLjc4NCAxNiAxLjc1djkuNUExLjc1IDEuNzUgMCAwIDEgMTQuMjUgMTNIOC4wNmwtMi41NzMgMi41NzNBMS40NTggMS40NTggMCAwIDEgMyAxNC41NDNWMTNIMS43NUExLjc1IDEuNzUgMCAwIDEgMCAxMS4yNXYtOS41QzAgLjc4NC43ODQgMCAxLjc1IDBaIiBmaWxsPSJ3aGl0ZSIvPgogIDxwYXRoIGQ9Ik0wIDEuNzVDMCAuNzg0Ljc4NCAwIDEuNzUgMGgxMi41QzE1LjIxNiAwIDE2IC43ODQgMTYgMS43NXY5LjVBMS43NSAxLjc1IDAgMCAxIDE0LjI1IDEzSDguMDZsLTIuNTczIDIuNTczQTEuNDU4IDEuNDU4IDAgMCAxIDMgMTQuNTQzVjEzSDEuNzVBMS43NSAxLjc1IDAgMCAxIDAgMTEuMjVabTEuNzUtLjI1YS4yNS4yNSAwIDAgMC0uMjUuMjV2OS41YzAgLjEzOC4xMTIuMjUuMjUuMjVoMmEuNzUuNzUgMCAwIDEgLjc1Ljc1djIuMTlsMi43Mi0yLjcyYS43NDkuNzQ5IDAgMCAxIC41My0uMjJoNi41YS4yNS4yNSAwIDAgMCAuMjUtLjI1di05LjVhLjI1LjI1IDAgMCAwLS4yNS0uMjVabTcgMi4yNXYyLjVhLjc1Ljc1IDAgMCAxLTEuNSAwdi0yLjVhLjc1Ljc1IDAgMCAxIDEuNSAwWk05IDlhMSAxIDAgMSAxLTIgMCAxIDEgMCAwIDEgMiAwWiI+PC9wYXRoPgo8L3N2Zz4K" width="16" height="16" style="vertical-align: middle;"/> Important:
-    <strong>Restart Your OBS Studio After Changing Your Settings<strong></p>
 
     <p style="font-size: 14px; margin-top: 10px;">
         <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjxzdmcKICAgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIgogICB4bWxuczpjYz0iaHR0cDovL2NyZWF0aXZlY29tbW9ucy5vcmcvbnMjIgogICB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiCiAgIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciCiAgIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKICAgeG1sbnM6c29kaXBvZGk9Imh0dHA6Ly9zb2RpcG9kaS5zb3VyY2Vmb3JnZS5uZXQvRFREL3NvZGlwb2RpLTAuZHRkIgogICB4bWxuczppbmtzY2FwZT0iaHR0cDovL3d3dy5pbmtzY2FwZS5vcmcvbmFtZXNwYWNlcy9pbmtzY2FwZSIKICAgd2lkdGg9IjEwMjQiCiAgIGhlaWdodD0iMTAyNCIKICAgdmlld0JveD0iMCAwIDEwMjQgMTAyNCIKICAgZmlsbD0ibm9uZSIKICAgdmVyc2lvbj0iMS4xIgogICBpZD0ic3ZnODM1IgogICBzb2RpcG9kaTpkb2NuYW1lPSJPY3RpY29ucy1tYXJrLWdpdGh1Yi5zdmciCiAgIGlua3NjYXBlOnZlcnNpb249IjEuMC4yIChlODZjODcwOCwgMjAyMS0wMS0xNSkiPgogIDxtZXRhZGF0YQogICAgIGlkPSJtZXRhZGF0YTg0MSI+CiAgICA8cmRmOlJERj4KICAgICAgPGNjOldvcmsKICAgICAgICAgcmRmOmFib3V0PSIiPgogICAgICAgIDxkYzpmb3JtYXQ+aW1hZ2Uvc3ZnK3htbDwvZGM6Zm9ybWF0PgogICAgICAgIDxkYzp0eXBlCiAgICAgICAgICAgcmRmOnJlc291cmNlPSJodHRwOi8vcHVybC5vcmcvZGMvZGNtaXR5cGUvU3RpbGxJbWFnZSIgLz4KICAgICAgPC9jYzpXb3JrPgogICAgPC9yZGY6UkRGPgogIDwvbWV0YWRhdGE+CiAgPGRlZnMKICAgICBpZD0iZGVmczgzOSIgLz4KICA8c29kaXBvZGk6bmFtZWR2aWV3CiAgICAgcGFnZWNvbG9yPSIjZmZmZmZmIgogICAgIGJvcmRlcmNvbG9yPSIjNjY2NjY2IgogICAgIGJvcmRlcm9wYWNpdHk9IjEiCiAgICAgb2JqZWN0dG9sZXJhbmNlPSIxMCIKICAgICBncmlkdG9sZXJhbmNlPSIxMCIKICAgICBndWlkZXRvbGVyYW5jZT0iMTAiCiAgICAgaW5rc2NhcGU6cGFnZW9wYWNpdHk9IjAiCiAgICAgaW5rc2NhcGU6cGFnZXNoYWRvdz0iMiIKICAgICBpbmtzY2FwZTp3aW5kb3ctd2lkdGg9IjE0NDAiCiAgICAgaW5rc2NhcGU6d2luZG93LWhlaWdodD0iNzk4IgogICAgIGlkPSJuYW1lZHZpZXc4MzciCiAgICAgc2hvd2dyaWQ9ImZhbHNlIgogICAgIGlua3NjYXBlOnpvb209IjAuNjA0NDkyMTkiCiAgICAgaW5rc2NhcGU6Y3g9IjUxMiIKICAgICBpbmtzY2FwZTpjeT0iNTEyIgogICAgIGlua3NjYXBlOndpbmRvdy14PSIwIgogICAgIGlua3NjYXBlOndpbmRvdy15PSIyNSIKICAgICBpbmtzY2FwZTp3aW5kb3ctbWF4aW1pemVkPSIwIgogICAgIGlua3NjYXBlOmN1cnJlbnQtbGF5ZXI9InN2ZzgzNSIgLz4KICA8cGF0aAogICAgIGZpbGwtcnVsZT0iZXZlbm9kZCIKICAgICBjbGlwLXJ1bGU9ImV2ZW5vZGQiCiAgICAgZD0iTTggMEMzLjU4IDAgMCAzLjU4IDAgOEMwIDExLjU0IDIuMjkgMTQuNTMgNS40NyAxNS41OUM1Ljg3IDE1LjY2IDYuMDIgMTUuNDIgNi4wMiAxNS4yMUM2LjAyIDE1LjAyIDYuMDEgMTQuMzkgNi4wMSAxMy43MkM0IDE0LjA5IDMuNDggMTMuMjMgMy4zMiAxMi43OEMzLjIzIDEyLjU1IDIuODQgMTEuODQgMi41IDExLjY1QzIuMjIgMTEuNSAxLjgyIDExLjEzIDIuNDkgMTEuMTJDMy4xMiAxMS4xMSAzLjU3IDExLjcgMy43MiAxMS45NEM0LjQ0IDEzLjE1IDUuNTkgMTIuODEgNi4wNSAxMi42QzYuMTIgMTIuMDggNi4zMyAxMS43MyA2LjU2IDExLjUzQzQuNzggMTEuMzMgMi45MiAxMC42NCAyLjkyIDcuNThDMi45MiA2LjcxIDMuMjMgNS45OSAzLjc0IDUuNDNDMy42NiA1LjIzIDMuMzggNC40MSAzLjgyIDMuMzFDMy44MiAzLjMxIDQuNDkgMy4xIDYuMDIgNC4xM0M2LjY2IDMuOTUgNy4zNCAzLjg2IDguMDIgMy44NkM4LjcgMy44NiA5LjM4IDMuOTUgMTAuMDIgNC4xM0MxMS41NSAzLjA5IDEyLjIyIDMuMzEgMTIuMjIgMy4zMUMxMi42NiA0LjQxIDEyLjM4IDUuMjMgMTIuMyA1LjQzQzEyLjgxIDUuOTkgMTMuMTIgNi43IDEzLjEyIDcuNThDMTMuMTIgMTAuNjUgMTEuMjUgMTEuMzMgOS40NyAxMS41M0M5Ljc2IDExLjc4IDEwLjAxIDEyLjI2IDEwLjAxIDEzLjAxQzEwLjAxIDE0LjA4IDEwIDE0Ljk0IDEwIDE1LjIxQzEwIDE1LjQyIDEwLjE1IDE1LjY3IDEwLjU1IDE1LjU5QzEzLjcxIDE0LjUzIDE2IDExLjUzIDE2IDhDMTYgMy41OCAxMi40MiAwIDggMFoiCiAgICAgdHJhbnNmb3JtPSJzY2FsZSg2NCkiCiAgICAgZmlsbD0iIzFCMUYyMyIKICAgICBpZD0icGF0aDgzMyIKICAgICBzdHlsZT0iZmlsbDojZmZmZmZmO2ZpbGwtb3BhY2l0eToxIiAvPgo8L3N2Zz4K" width="16" height="16" style="vertical-align: middle;"/>
-       <a href="https://github.com/channel101/obs_RecordingIndicator" style="color: #1E90FF; text-decoration: none; font-weight: bold; margin-left: 5px;">GitHub Repository</a>
+       <a href="https://github.com/channel101/obs_recording_indicator" style="color: #1E90FF; text-decoration: none; font-weight: bold; margin-left: 5px;">GitHub Repository</a>
     </p>
     """
-
-
+ 
 
 def script_properties():
     props = obs.obs_properties_create()
