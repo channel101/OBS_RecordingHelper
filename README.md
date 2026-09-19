@@ -1,7 +1,7 @@
-# Recording Helper For OBS Studio
+# Recording Indicator For OBS Studio
 > **Recording Indicator For Your OBS Studio**
 
-![alt text](./Instructions/new_preview_img.png)
+![alt text](./assets/preview.png)
 
 --- 
 
@@ -27,7 +27,7 @@ You can drag the window to reposition the popup.
 
 ### Installation
 1. In OBS, go to **Tools > Scripts**.
-2. Click the **+** button and add the downloaded `OBS_RecordingHelper.py` file from [GitHub Release](https://github.com/channel101/OBS_RecordingHelper/releases/latest).
+2. Click the **+** button and add the downloaded `OBS_RecordingHelper.py` file from [GitHub Release](./releases/latest).
 
 > Make sure PATH is set in OBS's Python Setting Tab.
 
