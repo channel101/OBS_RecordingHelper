@@ -1,0 +1,20 @@
+name: Draft New Release
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    
+jobs:
+  build:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+  
+    steps:
+    - uses: release-drafter/release-drafter@v7
+      with:
+        config-name: release-config.yaml
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
