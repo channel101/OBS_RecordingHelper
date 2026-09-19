@@ -1,7 +1,7 @@
 # Recording Indicator For OBS Studio
 > **Recording Indicator For Your OBS Studio**
 
-<img src="./assets/summary_preview.png" alt="preview image" width="200"/>
+<a href="#installation"><img src="./assets/summary_preview.png" alt="preview image" width="200"/></a>
 
 --- 
 
@@ -16,6 +16,7 @@ You can drag the window to reposition the popup.
 - Preference settings for showing timers & status texts.
 - Pause and unpause using right-click menu.
 - Always on top.
+- Hide Indicator in Captured Video (Windows Only)
 
 ---
 
@@ -28,14 +29,9 @@ You can drag the window to reposition the popup.
 ### Installation
 1. In OBS, go to **Tools > Scripts**.
 2. Click the **+** button and add the downloaded `obs_recording_indicator_{version}.py` file from [GitHub Release](../../releases/latest).
-
 > Make sure PATH is set in OBS's Python Setting Tab.
-
-> [!IMPORTANT]  
-> 3. Save & exit OBS and restart OBS.
-
-> [!NOTE]  
-> Without restarting OBS, the script may not work well.
+3. Save & exit Tools.
+4. Done! :)
 
 ---
 
