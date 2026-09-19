@@ -1,9 +1,13 @@
-# Recording Indicator For OBS Studio
-> **Recording Indicator For Your OBS Studio**
+<p align="center">
+  <a href="#installation"><img src="./assets/logo.png" alt="logo" width="80"/></a>
+</p>
+<h1 align="center">Recording Indicator</h1>
+<h3 align="center">Made For Your OBS Studio<a href="#installation"></h3>
+<p align="center">
+ <a href="#installation"><img src="./assets/summary_preview.png" alt="preview image" width="150"/></a>
+</p>
 
-<a href="#installation"><img src="./assets/summary_preview.png" alt="preview image" width="200"/></a>
-
---- 
+---
 
 ## How it works
 When the 'Start recording' button is pressed, a popup window appears on top of the screen showing you that OBS is recording. 
