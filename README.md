@@ -1,32 +1,45 @@
-# OBS RECORDING NOTIFICATION
+# Recording Helper For OBS Studio
+> **Recording Indicator For Your OBS Studio**
 
-A popup window that notifies you when OBS is recording
+![alt text](./Instructions/new_preview_img.png)
 
-![alt text](https://raw.githubusercontent.com/tobsailbot/obs_recording_notification/main/Instructions/rec%20timer.PNG)
+--- 
 
-### How it works:
-When the 'Start recording' button is pressed a popup window appears on top of the screen showing you that OBS is recording
-You can left-click and drag the window to position it.
-This script was made using Python and tkinter library.
+## How it works
+When the 'Start recording' button is pressed, a popup window appears on top of the screen showing you that OBS is recording. 
+You can drag the window to reposition the popup.
 
-### Features:
-- The window sticks to the edges of the screen when they are close.
-- You can enable or disable the Timer in the properties
-- Pause and unpause supported
-- The window is always on top (*negative feature: full screen programs are not supported :c ) 
-            
-        
-### Installation:
-- Download the python-3.6.8-embed-amd64.rar that includes a Python compatible package with the necessary libraries.
-- Open OBS and go to - Tools - Scripts.
-- Configure the Python installation path by selecting the extracted folder.
-- Go to Scripts tab, click the + button and add the "obs_recording_notification.py" file.
-- Restart OBS and hit Start Recording. 
+*This script was made using Python and the tkinter library with ❤️*
 
+## Features
+- Custom sticks-to-edges popup implemented.
+- Preference settings for showing timers & status texts.
+- Pause and unpause using right-click menu.
+- Always on top.
 
-![alt text](https://raw.githubusercontent.com/tobsailbot/obs_recording_notification/main/Instructions/python%20select.PNG)
+---
 
+## Guides
 
+### Requirements
+- Python 3
+- Additional requirements needed by platforms are written [here](https://docs.obsproject.com/scripting).
 
-## ATTENTION: 
-If you find any kind of bug I suggest you reset the program and kill the OBS process from the task manager. Only tested on Windows 
+### Installation
+1. In OBS, go to **Tools > Scripts**.
+2. Click the **+** button and add the downloaded `OBS_RecordingHelper.py` file from [GitHub Release](https://github.com/channel101/OBS_RecordingHelper/releases/latest).
+
+> Make sure PATH is set in OBS's Python Setting Tab.
+
+> [!IMPORTANT]  
+> 3. Save & exit OBS and restart OBS.
+
+> [!NOTE]  
+> Without restarting OBS, the script may not work well.
+
+---
+
+## LICENSE & COPYRIGHTS
+
+The original codes & libraries were written & made by [@tobsailbot](https://github.com/tobsailbot). 
+Some major fixes & improvements were made here, but this repo may be merged after some reviews from the original repo contributors & authors.
