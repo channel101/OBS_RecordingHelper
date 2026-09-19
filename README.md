@@ -39,7 +39,7 @@ You can drag the window to reposition the popup.
 
 ---
 
-## LICENSE & COPYRIGHTS
+## LICENSE & CopyRights
 
 The original codes & libraries were written & made by [@tobsailbot](https://github.com/tobsailbot). 
 Some major fixes & improvements were made here, but this repo may be merged after some reviews from the original repo contributors & authors.
