@@ -1,10 +1,10 @@
+import sys 
+import threading 
+
 import ctypes  
 import tkinter as tk
-from tkinter import BOTH, Canvas, Frame, Label, Menu, threading
-import sys 
+from tkinter import BOTH, Canvas, Frame, Label, Menu, font
 import obspython as obs
-
-# --------------------------------------------------
 
 lastClickX = 0
 lastClickY = 0
@@ -15,43 +15,28 @@ clickReleaseY = 0
 window = None
 is_paused = False
 
-# ----------------------------------------------------------------------------------------
-
-# ***** VARIABLES *****
-# use a boolean variable to help control state of time (running or not running)
 running = False
-# time variables initially set to 0
 hours, minutes, seconds = 0, 0, 0
-
-# ***** Settings Variables *****
-# whether to view total time pasted
 timer_enable = True
-# whether the recording is working or not for accessibility
-status_text_enable = True
-
-# ----------------------------------------------------------------------------------------
+popup_menu = None
 
 loop_destroy = False
 window_start = False
-
 
 class Application(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         self.config(bg="#1a1a1a")
         self.pack()
-
-        # Dynamic position based on config
         self.update_position()
 
         win_opacity = 0.8
 
-        self.master.attributes("-alpha", 0.0)  # Start hidden
-        self.master.configure(bg="#0f0f0f")  # Darker background
-        self.master.overrideredirect(1)  # Borderless window
-        self.master.attributes("-topmost", True)  # Always on top
+        self.master.attributes("-alpha", 0.0)
+        self.master.configure(bg="#0f0f0f")
+        self.master.overrideredirect(1) 
+        self.master.attributes("-topmost", True)
 
-        # Add rounded corners effect
         self.master.attributes("-transparentcolor", "#0f0f0f")
         self.config(bg="#0f0f0f")
 
@@ -75,10 +60,7 @@ class Application(tk.Frame):
             highlightcolor="#404040",
         )
         container.pack(padx=5, pady=5, fill=BOTH, expand=True)
-
-        font_size = int(11 * self.scale)
-
-        # canvas for REC button
+        font_size = font.Font(size=int(11 * self.scale))
         self.canvas = Canvas(
             container,
             height=30,
@@ -87,42 +69,29 @@ class Application(tk.Frame):
             highlightthickness=0,
         )
         self.canvas.grid(row=0, column=0, padx=(10, 5), pady=5)
-
-        if timer_enable == True:
-            # Label For Timer
+        
+        if timer_enable:
             self.stopwatch_label = Label(
-                container, text="00:00:00", font=("Segoe UI", font_size, "bold")
+                container, text="00:00:00", font=font_size
             )
-            self.stopwatch_label.grid(row=0, column=1, padx=(0, 15), pady=5)
+            self.stopwatch_label.grid(row=0, column=1, padx=(0, 15), pady=5, sticky="ew")
             self.stopwatch_label.config(bg="#252525", fg="#ffffff")
-
-        if status_text_enable == True:
-            # Label For Text Status
-            self.status_label = Label(
-                container, text="", font=("Segoe UI", font_size, "bold")
-            )
-            self.status_label.grid(row=1, column=1, padx=(0, 15), pady=5)
-            self.status_label.config(bg="#252525", fg="#ffffff")
-
-        # snap window to borders function
+        
         def ClickRelease(event):
-            resolutionX = (
-                self.master.winfo_screenwidth()
-            )  # gets the actual screen resolution
-            resolutionY = self.master.winfo_screenheight()
-            global x, y
-            if (
-                self.master.winfo_y() < 0
-            ):  # if the current window position is below 0 , then move the window
-                self.master.geometry("+%s+%s" % (x, 0))
-            if self.master.winfo_y() > (resolutionY - 60):
-                self.master.geometry("+%s+%s" % (x, (resolutionY - 61)))
-            if self.master.winfo_x() < 0:
-                self.master.geometry("+%s+%s" % (0, y))
-            if self.master.winfo_x() > (resolutionX - 140):
-                self.master.geometry("+%s+%s" % ((resolutionX - 140), y))
+            screen_width = self.master.winfo_screenwidth()
+            screen_height = self.master.winfo_screenheight()
 
-        # left click window dragging function
+            win_width = self.master.winfo_width()
+            win_height = self.master.winfo_height()
+
+            current_x = self.master.winfo_x()
+            current_y = self.master.winfo_y()
+
+            new_x = max(0, min(current_x, screen_width - win_width))
+            new_y = max(0, min(current_y, screen_height - win_height))
+            
+            self.master.geometry(f"+{new_x}+{new_y}")
+            
         def SaveLastClickPos(event):
             global lastClickX, lastClickY
             lastClickX = event.x
@@ -142,35 +111,23 @@ class Application(tk.Frame):
 
             self.master.bind(
                 "<Button-1>", SaveLastClickPos
-            )  # click to drag and drop window
+            ) 
             self.master.bind("<B1-Motion>", Dragging)
 
-        # open the popup menu
         def open_menu(e):
             popup_menu.tk_popup(e.x_root, e.y_root)
-
-        def pause_from_menu():
-            global is_paused
-            if not is_paused:
-                popup_menu.entryconfig(0, label="Unpause Recording")
-                obs.obs_frontend_recording_pause(True)
-                is_paused = True
-            else:
-                popup_menu.entryconfig(0, label="Pause Recording")
-                obs.obs_frontend_recording_pause(False)
-                is_paused = False
-
-        def stop_from_menu():
+        
+        def stop():
             global window_start
             global is_paused
             window_start = False
             is_paused = False
-            obs.obs_frontend_recording_stop()
+            obs.obs_frontend_recording_stop()  
 
-        # adds a right-click popup menu to the main frame
+        global popup_menu 
         popup_menu = Menu(self, tearoff=False)
-        popup_menu.add_command(label="Pause Recording", command=pause_from_menu)
-        popup_menu.add_command(label="Stop Recording", command=stop_from_menu)
+        popup_menu.add_command(label="Pause Recording", command=self.pause_btn)
+        popup_menu.add_command(label="Stop Recording", command=stop)
         popup_menu.add_separator()
         popup_menu.add_command(
             label="Reset Window Location", command=self.update_position
@@ -180,24 +137,20 @@ class Application(tk.Frame):
         self.master.bind("<ButtonRelease-1>", ClickRelease)
         self.master.bind(
             "<Button-1>", SaveLastClickPos
-        )  # click to drag and drop window
+        ) 
         self.master.bind("<B1-Motion>", Dragging)
 
     def update_position(self):
-        """Update window position and size based on screen resolution."""
         screen_w = self.master.winfo_screenwidth()
-        # Scale window: width = 15% of screen, height proportional
         w = max(300, min(500, int(screen_w * 0.20)))
         h = max(150, int(w * 0.20))
         x = (screen_w - w) // 2
         y = 20
-        self.scale = max(1.0, screen_w / 1920)  # 1.0 at 1080p, scales up for higher res
+        self.scale = max(1.0, screen_w / 1920)  
         self.master.geometry(f"{w}x{h}+{x}+{y}")
         self.master.update_idletasks()
 
-    # update stopwatch function
     def update(self):
-        # update seconds with (addition) compound assignment operator
         global hours, minutes, seconds
         seconds += 1
         if seconds == 60:
@@ -206,16 +159,12 @@ class Application(tk.Frame):
         if minutes == 60:
             hours += 1
             minutes = 0
-        # format time to include leading zeros
         hours_string = f"{hours}" if hours > 9 else f"0{hours}"
         minutes_string = f"{minutes}" if minutes > 9 else f"0{minutes}"
         seconds_string = f"{seconds}" if seconds > 9 else f"0{seconds}"
-        # update timer label after 1000 ms (1 second)
         self.stopwatch_label.config(
             text=hours_string + ":" + minutes_string + ":" + seconds_string
         )
-        # after each second (1000 milliseconds), call update function
-        # use update_time variable to cancel or pause the time using after_cancel
         global update_time
         update_time = self.stopwatch_label.after(1000, self.update)
 
@@ -225,20 +174,15 @@ class Application(tk.Frame):
             self.update()
             running = True
 
-    # reset function
     def reset(self):
         global running
         if running:
-            # cancel updating of time using after_cancel()
             self.stopwatch_label.after_cancel(update_time)
             running = False
-        # set variables back to zero
         global hours, minutes, seconds
         hours, minutes, seconds = 0, 0, -1
-        # set label back to zero
         self.stopwatch_label.config(text="00:00:00")
 
-    # pause function
     def pause(self):
         global running
         if running:
@@ -252,51 +196,65 @@ class Application(tk.Frame):
 
         if window_start and not is_paused:
             self.start()
-            self.master.attributes("-alpha", 0.9)  # window opacity
-            if status_text_enable:
-                self.status_label.config(text="OBS Is Recording")
+            self.master.attributes("-alpha", 0.9)  
             self.canvas.delete("all")
-            self.canvas.create_oval(21, 21, 2, 3, outline="grey10", fill="grey40")
-            self.canvas.create_oval(20, 20, 4, 5, fill="red", outline="")
+            
+            self.canvas.update() 
+            canvas_height = self.canvas.winfo_height()
+            
+            circle_size = 20
+            
+            x1 = 5
+            x2 = x1 + circle_size
+            
+            y1 = (canvas_height - circle_size) / 2
+            y2 = y1 + circle_size
+            
+            self.canvas.create_oval(x1, y1, x2, y2, fill="red", outline="", tags="circle_click")
+
         elif not window_start:
-            try:  # ingnore the error when the clock stops..
+            try: 
                 self.reset()
             except Exception:
                 pass
-            self.master.attributes("-alpha", 0.0)  # window opacity
+            self.master.attributes("-alpha", 0.0)
 
         if loop_destroy:
             self.destroy()
 
         elif is_paused:
             self.pause()
-            if status_text_enable:
-                self.status_label.config(text="OBS Recording paused")
             self.canvas.delete("all")
-            self.canvas.create_rectangle(10, 20, 5, 5, fill="grey20", outline="grey30")
-            self.canvas.create_rectangle(20, 20, 15, 5, fill="grey20", outline="grey30")
+            self.canvas.create_rectangle(5, 5, 10, 25, fill="#f8a63d", outline="")
+            self.canvas.create_rectangle(15, 5, 20, 25, fill="#f8a63d", outline="")
 
-        self.after(100, self.check_loop_status)  # Check again after delay.
+        self.canvas.bind("<Button-1>", self.pause_btn)
+        self.after(100, self.check_loop_status) 
 
+    def pause_btn(self, event=None):
+        global is_paused
+        if not is_paused:
+            popup_menu.entryconfig(0, label="Unpause Recording")
+            obs.obs_frontend_recording_pause(True)
+            is_paused = True
+        else:
+            popup_menu.entryconfig(0, label="Pause Recording")
+            obs.obs_frontend_recording_pause(False)
+            is_paused = False
 
-def runtk():  # runs in background thread
+def runtk(): 
     app = Application()
     app.master.title("Background Application Thread")
     app.check_loop_status()
     app.mainloop()
 
 
-thd = threading.Thread(target=runtk)  # gui thread
-thd.daemon = True  # background thread will exit if main thread exits
-
-# ----------------------------   OBS script    ------------------------------------------------------------
-
+thd = threading.Thread(target=runtk)  
+thd.daemon = True  
 
 class Data:
     OutputDir = None
 
-
-# this function responds to events inside OBS
 def frontend_event_handler(data):
     global is_paused
     global window_start
@@ -309,11 +267,9 @@ def frontend_event_handler(data):
     if data == obs.OBS_FRONTEND_EVENT_RECORDING_STOPPED:
         window_start = False
         is_paused = False
-        print("REC stops..")
 
     if data == obs.OBS_FRONTEND_EVENT_RECORDING_PAUSED:
         is_paused = True
-        print("REC paused..")
 
     if data == obs.OBS_FRONTEND_EVENT_RECORDING_UNPAUSED:
         is_paused = False
@@ -331,21 +287,11 @@ def script_update(settings):
     obs.obs_data_set_default_bool(settings, "timer_bool", True)
     Data.TimerEnable = obs.obs_data_get_bool(settings, "timer_bool")
 
-    obs.obs_data_set_default_bool(settings, "status_text_bool", True)
-    Data.StatusTextEnable = obs.obs_data_get_bool(settings, "status_text_bool")
-
     global timer_enable
     if Data.TimerEnable == True:
         timer_enable = True
     else:
         timer_enable = False
-
-    global status_text_enable
-    if Data.StatusTextEnable == True:
-        status_text_enable = True
-    else:
-        status_text_enable = False
-
 
 def script_description():
     return f"""
@@ -358,15 +304,10 @@ def script_description():
        <a href="https://github.com/channel101/obs_recording_indicator" style="color: #1E90FF; text-decoration: none; font-weight: bold; margin-left: 5px;">GitHub Repository</a>
     </p>
     """
- 
 
 def script_properties():
     props = obs.obs_properties_create()
-
     obs.obs_properties_add_bool(props, "timer_bool", "Enable Timer")
-    obs.obs_properties_add_bool(props, "status_text_bool", "Show Status Text")
-
     return props
-
 
 obs.obs_frontend_add_event_callback(frontend_event_handler)
