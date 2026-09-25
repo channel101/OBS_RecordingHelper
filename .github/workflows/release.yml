@@ -61,8 +61,8 @@ jobs:
       - name: Create Draft Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ env.NEW_VERSION }}
-          name: v${{ env.NEW_VERSION }}
+          tag_name: ${{ env.NEW_VERSION }}
+          name: ${{ env.NEW_VERSION }}
           draft: true 
           prerelease: false
           body_path: .github/release/template.md
