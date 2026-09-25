@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="#installation"><img src="./assets/logo.png" alt="logo" width="80"/></a>
+  <a href="#installation"><img src="./assets/obs_recording_indicator_logo.png" alt="logo" width="80"/></a>
 </p>
 <h1 align="center">Recording Indicator</h1>
 <h3 align="center">Made For Your OBS Studio<a href="#installation"></h3>

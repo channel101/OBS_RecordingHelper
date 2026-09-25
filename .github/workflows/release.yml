@@ -1,0 +1,70 @@
+name: Draft Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version Type (major, minor, patch)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  create-draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 
+
+      - name: Calculate Next Version
+        id: calc_version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -ra ADDR <<< "$VERSION"
+          
+          MAJOR=${ADDR[0]}
+          MINOR=${ADDR[1]}
+          PATCH=${ADDR[2]}
+          BUMP="${{ inputs.bump_type }}"
+          
+          if [ "$BUMP" == "major" ]; then
+            MAJOR=$((MAJOR+1))
+            MINOR=0
+            PATCH=0
+          elif [ "$BUMP" == "minor" ]; then
+            MINOR=$((MINOR+1))
+            PATCH=0
+          else
+            PATCH=$((PATCH+1))
+          fi
+          
+          NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+          echo "Previous Version: $LATEST_TAG -> New Version: $NEW_VERSION"
+          
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Replace version in template
+        run: |
+          sed -i "s/{version}/${NEW_VERSION}/g" .github/release/template.md
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ env.NEW_VERSION }}
+          name: v${{ env.NEW_VERSION }}
+          draft: true 
+          prerelease: false
+          body_path: .github/release/template.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,42 +1,40 @@
-import sys 
-import threading 
-
-import ctypes  
+import sys
+import time
+import threading
+import ctypes
 import tkinter as tk
 from tkinter import BOTH, Canvas, Frame, Label, Menu, font
 import obspython as obs
 
-lastClickX = 0
-lastClickY = 0
 
-clickReleaseX = 0
-clickReleaseY = 0
+class AppState:
+    def __init__(self):
+        self.is_recording = False
+        self.is_paused = False
+        self.should_exit = False
+        self.timer_enabled = True
 
-window = None
-is_paused = False
 
-running = False
-hours, minutes, seconds = 0, 0, 0
-timer_enable = True
-popup_menu = None
+state = AppState()
+app_thread = None
 
-loop_destroy = False
-window_start = False
 
-class Application(tk.Frame):
+class IndicatorApp(tk.Frame):
     def __init__(self, master=None):
-        tk.Frame.__init__(self, master)
+        super().__init__(master)
+        self.master = master
         self.config(bg="#1a1a1a")
         self.pack()
-        self.update_position()
 
-        win_opacity = 0.8
+        self.start_time = 0
+        self.accumulated_time = 0
+        self.timer_running = False
 
+        self.win_opacity = 0.8
         self.master.attributes("-alpha", 0.0)
         self.master.configure(bg="#0f0f0f")
-        self.master.overrideredirect(1) 
+        self.master.overrideredirect(1)
         self.master.attributes("-topmost", True)
-
         self.master.attributes("-transparentcolor", "#0f0f0f")
         self.config(bg="#0f0f0f")
 
@@ -47,98 +45,50 @@ class Application(tk.Frame):
                 user32 = ctypes.windll.user32
                 hwnd = user32.GetParent(self.master.winfo_id())
                 user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[Indicator] Failed to set window affinity: {e}")
 
-        self.master.attributes("-alpha", win_opacity) 
-        container = Frame(
+        self.update_position()
+
+        self.container = Frame(
             self,
             bg="#252525",
             bd=0,
             highlightthickness=1,
             highlightbackground="#404040",
-            highlightcolor="#404040",
         )
-        container.pack(padx=5, pady=5, fill=BOTH, expand=True)
-        font_size = font.Font(size=int(11 * self.scale))
+        self.container.pack(padx=5, pady=5, fill=BOTH, expand=True)
+
         self.canvas = Canvas(
-            container,
-            height=30,
-            width=30,
-            bg="#252525",
-            highlightthickness=0,
+            self.container, height=30, width=30, bg="#252525", highlightthickness=0
         )
         self.canvas.grid(row=0, column=0, padx=(10, 5), pady=5)
-        
-        if timer_enable:
-            self.stopwatch_label = Label(
-                container, text="00:00:00", font=font_size
-            )
-            self.stopwatch_label.grid(row=0, column=1, padx=(0, 15), pady=5, sticky="ew")
-            self.stopwatch_label.config(bg="#252525", fg="#ffffff")
-        
-        def ClickRelease(event):
-            screen_width = self.master.winfo_screenwidth()
-            screen_height = self.master.winfo_screenheight()
+        self.canvas.bind("<Button-1>", self.toggle_pause)
 
-            win_width = self.master.winfo_width()
-            win_height = self.master.winfo_height()
+        font_style = font.Font(size=int(11 * self.scale), weight="bold")
+        self.stopwatch_label = Label(
+            self.container, text="00:00:00", font=font_style, bg="#252525", fg="#ffffff"
+        )
+        self.stopwatch_label.grid(row=0, column=1, padx=(0, 15), pady=5, sticky="ew")
 
-            current_x = self.master.winfo_x()
-            current_y = self.master.winfo_y()
-
-            new_x = max(0, min(current_x, screen_width - win_width))
-            new_y = max(0, min(current_y, screen_height - win_height))
-            
-            self.master.geometry(f"+{new_x}+{new_y}")
-            
-        def SaveLastClickPos(event):
-            global lastClickX, lastClickY
-            lastClickX = event.x
-            lastClickY = event.y
-
-        def Dragging(event):
-            global x, y
-            x, y = (
-                event.x - lastClickX + self.master.winfo_x(),
-                event.y - lastClickY + self.master.winfo_y(),
-            )
-            self.master.geometry("+%s+%s" % (x, y))
-
-            self.master.attributes("-alpha", win_opacity)
-            self.master.attributes("-topmost", True)
-            self.master.bind("<ButtonRelease-1>", ClickRelease)
-
-            self.master.bind(
-                "<Button-1>", SaveLastClickPos
-            ) 
-            self.master.bind("<B1-Motion>", Dragging)
-
-        def open_menu(e):
-            popup_menu.tk_popup(e.x_root, e.y_root)
-        
-        def stop():
-            global window_start
-            global is_paused
-            window_start = False
-            is_paused = False
-            obs.obs_frontend_recording_stop()  
-
-        global popup_menu 
-        popup_menu = Menu(self, tearoff=False)
-        popup_menu.add_command(label="Pause Recording", command=self.pause_btn)
-        popup_menu.add_command(label="Stop Recording", command=stop)
-        popup_menu.add_separator()
-        popup_menu.add_command(
+        self.popup_menu = Menu(self, tearoff=False)
+        self.popup_menu.add_command(label="Pause Recording", command=self.toggle_pause)
+        self.popup_menu.add_command(label="Stop Recording", command=self.stop_recording)
+        self.popup_menu.add_separator()
+        self.popup_menu.add_command(
             label="Reset Window Location", command=self.update_position
         )
-        self.master.bind("<Button-3>", open_menu)
 
-        self.master.bind("<ButtonRelease-1>", ClickRelease)
-        self.master.bind(
-            "<Button-1>", SaveLastClickPos
-        ) 
-        self.master.bind("<B1-Motion>", Dragging)
+        self.master.bind("<Button-3>", self.show_menu)
+        self.master.bind("<Button-1>", self.on_click)
+        self.master.bind("<B1-Motion>", self.on_drag)
+        self.master.bind("<ButtonRelease-1>", self.on_release)
+
+        self.last_x = 0
+        self.last_y = 0
+
+        self.check_state_loop()
+        self.update_timer_loop()
 
     def update_position(self):
         screen_w = self.master.winfo_screenwidth()
@@ -146,155 +96,136 @@ class Application(tk.Frame):
         h = max(150, int(w * 0.20))
         x = (screen_w - w) // 2
         y = 20
-        self.scale = max(1.0, screen_w / 1920)  
+        self.scale = max(1.0, screen_w / 1920)
         self.master.geometry(f"{w}x{h}+{x}+{y}")
         self.master.update_idletasks()
 
-    def update(self):
-        global hours, minutes, seconds
-        seconds += 1
-        if seconds == 60:
-            minutes += 1
-            seconds = 0
-        if minutes == 60:
-            hours += 1
-            minutes = 0
-        hours_string = f"{hours}" if hours > 9 else f"0{hours}"
-        minutes_string = f"{minutes}" if minutes > 9 else f"0{minutes}"
-        seconds_string = f"{seconds}" if seconds > 9 else f"0{seconds}"
-        self.stopwatch_label.config(
-            text=hours_string + ":" + minutes_string + ":" + seconds_string
-        )
-        global update_time
-        update_time = self.stopwatch_label.after(1000, self.update)
+    def on_click(self, event):
+        self.last_x = event.x
+        self.last_y = event.y
 
-    def start(self):
-        global running
-        if not running:
-            self.update()
-            running = True
+    def on_drag(self, event):
+        x = event.x - self.last_x + self.master.winfo_x()
+        y = event.y - self.last_y + self.master.winfo_y()
+        self.master.geometry(f"+{x}+{y}")
 
-    def reset(self):
-        global running
-        if running:
-            self.stopwatch_label.after_cancel(update_time)
-            running = False
-        global hours, minutes, seconds
-        hours, minutes, seconds = 0, 0, -1
-        self.stopwatch_label.config(text="00:00:00")
+    def on_release(self, event):
+        screen_w = self.master.winfo_screenwidth()
+        screen_h = self.master.winfo_screenheight()
+        win_w = self.master.winfo_width()
+        win_h = self.master.winfo_height()
 
-    def pause(self):
-        global running
-        if running:
-            self.stopwatch_label.after_cancel(update_time)
-            running = False
+        new_x = max(0, min(self.master.winfo_x(), screen_w - win_w))
+        new_y = max(0, min(self.master.winfo_y(), screen_h - win_h))
+        self.master.geometry(f"+{new_x}+{new_y}")
 
-    def check_loop_status(self):
-        global window_start
-        global loop_destroy
-        global is_paused
+    def show_menu(self, event):
+        self.popup_menu.tk_popup(event.x_root, event.y_root)
 
-        if window_start and not is_paused:
-            self.start()
-            self.master.attributes("-alpha", 0.9)  
-            self.canvas.delete("all")
-            
-            self.canvas.update() 
-            canvas_height = self.canvas.winfo_height()
-            
-            circle_size = 20
-            
-            x1 = 5
-            x2 = x1 + circle_size
-            
-            y1 = (canvas_height - circle_size) / 2
-            y2 = y1 + circle_size
-            
-            self.canvas.create_oval(x1, y1, x2, y2, fill="red", outline="", tags="circle_click")
-
-        elif not window_start:
-            try: 
-                self.reset()
-            except Exception:
-                pass
-            self.master.attributes("-alpha", 0.0)
-
-        if loop_destroy:
-            self.destroy()
-
-        elif is_paused:
-            self.pause()
-            self.canvas.delete("all")
-            self.canvas.create_rectangle(5, 5, 10, 25, fill="#f8a63d", outline="")
-            self.canvas.create_rectangle(15, 5, 20, 25, fill="#f8a63d", outline="")
-
-        self.canvas.bind("<Button-1>", self.pause_btn)
-        self.after(100, self.check_loop_status) 
-
-    def pause_btn(self, event=None):
-        global is_paused
-        if not is_paused:
-            popup_menu.entryconfig(0, label="Unpause Recording")
-            obs.obs_frontend_recording_pause(True)
-            is_paused = True
-        else:
-            popup_menu.entryconfig(0, label="Pause Recording")
+    def toggle_pause(self, event=None):
+        if state.is_paused:
             obs.obs_frontend_recording_pause(False)
-            is_paused = False
+        else:
+            obs.obs_frontend_recording_pause(True)
 
-def runtk(): 
-    app = Application()
-    app.master.title("Background Application Thread")
-    app.check_loop_status()
+    def stop_recording(self):
+        obs.obs_frontend_recording_stop()
+
+    def check_state_loop(self):
+        if state.should_exit:
+            self.master.destroy()
+            return
+
+        if state.is_recording:
+            self.master.attributes("-alpha", self.win_opacity)
+            self.canvas.delete("all")
+
+            if state.is_paused:
+                self.canvas.create_rectangle(5, 5, 10, 25, fill="#f8a63d", outline="")
+                self.canvas.create_rectangle(15, 5, 20, 25, fill="#f8a63d", outline="")
+                self.popup_menu.entryconfig(0, label="Unpause Recording")
+
+                if self.timer_running:
+                    self.accumulated_time += time.time() - self.start_time
+                    self.timer_running = False
+            else:
+                self.canvas.create_oval(5, 5, 25, 25, fill="red", outline="")
+                self.popup_menu.entryconfig(0, label="Pause Recording")
+
+                if not self.timer_running:
+                    self.start_time = time.time()
+                    self.timer_running = True
+        else:
+            self.master.attributes("-alpha", 0.0)
+            self.timer_running = False
+            self.accumulated_time = 0
+            self.stopwatch_label.config(text="00:00:00")
+
+        if state.timer_enabled:
+            self.stopwatch_label.grid()
+        else:
+            self.stopwatch_label.grid_remove()
+
+        self.after(200, self.check_state_loop)
+
+    def update_timer_loop(self):
+        if state.should_exit:
+            return
+
+        if self.timer_running and state.timer_enabled:
+            elapsed = int(time.time() - self.start_time + self.accumulated_time)
+            hours = elapsed // 3600
+            minutes = (elapsed % 3600) // 60
+            seconds = elapsed % 60
+            self.stopwatch_label.config(text=f"{hours:02d}:{minutes:02d}:{seconds:02d}")
+
+        self.after(1000, self.update_timer_loop)
+
+
+def run_tkinter():
+    root = tk.Tk()
+    root.title("OBS Recording Indicator")
+    app = IndicatorApp(master=root)
     app.mainloop()
 
 
-thd = threading.Thread(target=runtk)  
-thd.daemon = True  
+def frontend_event_handler(event):
+    if event == obs.OBS_FRONTEND_EVENT_RECORDING_STARTING:
+        state.is_recording = True
+        state.is_paused = False
+    elif event == obs.OBS_FRONTEND_EVENT_RECORDING_STOPPED:
+        state.is_recording = False
+        state.is_paused = False
+    elif event == obs.OBS_FRONTEND_EVENT_RECORDING_PAUSED:
+        state.is_paused = True
+    elif event == obs.OBS_FRONTEND_EVENT_RECORDING_UNPAUSED:
+        state.is_paused = False
 
-class Data:
-    OutputDir = None
-
-def frontend_event_handler(data):
-    global is_paused
-    global window_start
-    global loop_destroy
-
-    if data == obs.OBS_FRONTEND_EVENT_RECORDING_STARTING:
-        window_start = True
-        is_paused = False
-
-    if data == obs.OBS_FRONTEND_EVENT_RECORDING_STOPPED:
-        window_start = False
-        is_paused = False
-
-    if data == obs.OBS_FRONTEND_EVENT_RECORDING_PAUSED:
-        is_paused = True
-
-    if data == obs.OBS_FRONTEND_EVENT_RECORDING_UNPAUSED:
-        is_paused = False
 
 def script_load(settings):
-    global thd
-    if not thd.is_alive():
-        thd.start()
+    global app_thread
+    state.should_exit = False
+    if app_thread is None or not app_thread.is_alive():
+        app_thread = threading.Thread(target=run_tkinter, daemon=True)
+        app_thread.start()
+
 
 def script_unload():
-    global loop_destroy
-    loop_destroy = True     
+    state.should_exit = True
+
 
 def script_update(settings):
-    obs.obs_data_set_default_bool(settings, "timer_bool", True)
-    Data.TimerEnable = obs.obs_data_get_bool(settings, "timer_bool")
+    state.timer_enabled = obs.obs_data_get_bool(settings, "timer_bool")
 
-    global timer_enable
-    if Data.TimerEnable == True:
-        timer_enable = True
-    else:
-        timer_enable = False
+
+def script_properties():
+    props = obs.obs_properties_create()
+    obs.obs_properties_add_bool(props, "timer_bool", "Enable Timer")
+    return props
+
 
 def script_description():
-    return f"""
+    return """
     <h2><font color="white">Recording Indicator</font></h2>
     <p>Recording Indicator For Your OBS Studio</p>
     <hr>
@@ -305,9 +236,5 @@ def script_description():
     </p>
     """
 
-def script_properties():
-    props = obs.obs_properties_create()
-    obs.obs_properties_add_bool(props, "timer_bool", "Enable Timer")
-    return props
 
 obs.obs_frontend_add_event_callback(frontend_event_handler)
