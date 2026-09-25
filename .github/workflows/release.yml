@@ -6,7 +6,7 @@ on:
       bump_type:
         description: 'Version Type (major, minor, patch)'
         required: true
-        default: 'patch'
+        default: 'minor'
         type: choice
         options:
           - major
@@ -66,5 +66,6 @@ jobs:
           draft: true 
           prerelease: false
           body_path: .github/release/template.md
+          files: obs_recording_indicator.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
